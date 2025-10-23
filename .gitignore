@@ -1,0 +1,12 @@
+# Virtual environment
+venv/
+
+# Database
+db.sqlite3
+
+# Static files and media files
+/staticfiles
+/media
+
+# Environment variables
+.env

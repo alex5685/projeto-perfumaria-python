@@ -21,5 +21,8 @@ COPY . /app/
 # Coleta arquivos estáticos
 RUN python manage.py collectstatic --noinput
 
-# Comando de execução (Start Command: Gunicorn)
-CMD gunicorn core.wsgi
+# Garante que o Python encontre o Gunicorn dentro do ambiente virtual do container
+CMD ["/usr/local/bin/gunicorn", "core.wsgi"]
+
+
+

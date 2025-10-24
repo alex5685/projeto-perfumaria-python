@@ -25,7 +25,7 @@ SECRET_KEY = "django-insecure-r(n%$bl&2f6hmr$+pkmem-0r61w#v5btr&4otu6b+ldwd343iw
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['perfumaria-django.onrender.com', '.onrender.com', '127.0.0.1', 'localhost']
 
 
 # Application definition

@@ -13,7 +13,7 @@ class Produto(models.Model):
     estoque = models.IntegerField(default=0, verbose_name="Quantidade em Estoque")
     
     # Imagem (Gatilho para WhatsApp)
-    imagem = models.ImageField(upload_to='produtos/', verbose_name="Foto do Produto")
+    imagem = models.ImageField(upload_to='produtos/', blank=True, null=True)
     
     # Status de Publicação (Define se o produto está no site)
     publicado = models.BooleanField(default=False, verbose_name="Disponível no Site")

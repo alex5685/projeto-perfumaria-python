@@ -1,0 +1,6 @@
+<h1>Todos os Produtos</h1>
+{% for produto in produtos %}
+    <p><a href="{% url 'detalhe_produto' produto.id %}">{{ produto.nome }}</a></p>
+{% empty %}
+    <p>Nenhum produto disponível.</p>
+{% endfor %}

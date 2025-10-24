@@ -42,7 +42,7 @@ INSTALLED_APPS = [
 # core/settings.py
 
 # Local onde Django buscará os arquivos estáticos (CSS, JS, imagens do Admin)
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATIC_URL = 'static/'
 
 MIDDLEWARE = [
@@ -128,3 +128,13 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# core/settings.py (Adicionar no final)
+
+# Configuração para arquivos de mídia (uploads de usuários, como fotos de produtos)
+
+# Onde os arquivos de mídia serão SALVOS no disco (dentro da pasta media)
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# O prefixo da URL para acessar esses arquivos (ex: http://127.0.0.1:8000/media/Azzaro.png)
+MEDIA_URL = '/media/'

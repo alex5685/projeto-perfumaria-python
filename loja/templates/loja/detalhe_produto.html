@@ -1,0 +1,8 @@
+<h1>{{ produto.nome }}</h1>
+<p>Preço: R$ {{ produto.preco }}</p>
+<p>{{ produto.descricao }}</p>
+<form method="post" action="{% url 'adicionar_carrinho' produto.id %}">
+    {% csrf_token %}
+    <button type="submit">Comprar Agora (Simulação)</button>
+</form>
+<p><a href="{% url 'home' %}">Voltar para Home</a></p>

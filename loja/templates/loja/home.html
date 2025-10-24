@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Página Inicial | Perfumaria</title>
+</head>
+<body>
+    <h1>Bem-vindo à Loja! (MÓDULO PRINCIPAL)</h1>
+    <p>Aqui você verá os produtos em destaque.</p>
+    
+    <h2>Produtos em Destaque:</h2>
+    {% for produto in produtos %}
+        <p><a href="{% url 'detalhe_produto' produto.id %}">{{ produto.nome }}</a> - R$ {{ produto.preco }}</p>
+    {% empty %}
+        <p>Nenhum produto publicado ainda. Publique um no /admin/!</p>
+    {% endfor %}
+
+    <p><a href="{% url 'lista_produtos' %}">Ver todos os produtos</a></p>
+</body>
+</html>

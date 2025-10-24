@@ -1,5 +1,8 @@
-# Use uma imagem Python 3.10 Slim
+# Imagem base
 FROM python:3.10-slim
+
+# Variável de ambiente (para evitar buffers)
+ENV PYTHONUNBUFFERED 1
 
 # Instala as bibliotecas de sistema necessárias para o Pillow
 RUN apt-get update && apt-get install -y \
@@ -7,22 +10,16 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
-# Configura o ambiente
-ENV PYTHONUNBUFFERED 1
-WORKDIR /app
+# Cria o diretório de trabalho
+WORKDIR /usr/src/app
 
-# Copia os arquivos de dependência e instala (incluindo Pillow)
-COPY requirements.txt /app/
+# Copia apenas o requirements.txt e instala as dependências
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia o restante do projeto
-COPY . /app/
+# Copia o restante do código
+COPY . .
 
-# Coleta arquivos estáticos
-RUN python manage.py collectstatic --noinput
-
-# Garante que o Python encontre o Gunicorn dentro do ambiente virtual do container
+# Comando de execução (Start Command)
+# Usa a forma mais segura com o binário direto, já que o pip foi bem-sucedido.
 CMD ["/usr/local/bin/gunicorn", "core.wsgi"]
-
-
-

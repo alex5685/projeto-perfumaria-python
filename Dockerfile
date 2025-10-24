@@ -18,5 +18,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copia o restante do código
 COPY . /app/
 
-# Remove o CMD para forçar o Render a usar o Start Command da UI.
-# REMOVA A LINHA CMD.
+# Comando de execução (Start Command)
+CMD ["python", "-m", "gunicorn", "core.wsgi"]

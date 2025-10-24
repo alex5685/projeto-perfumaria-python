@@ -267,6 +267,7 @@ pendulum==3.1.0
 pexpect @ file:///tmp/build/80754af9/pexpect_1605563209008/work
 pickleshare @ file:///tmp/build/80754af9/pickleshare_1606932040724/work
 pillow @ file:///croot/pillow_1744613067434/work
+Pillow==10.0.0
 pkce @ file:///work/perseverance-python-buildout/croot/pkce_1698863336124/work
 pkginfo @ file:///croot/pkginfo_1743184746806/work
 platformdirs @ file:///croot/platformdirs_1744273042065/work

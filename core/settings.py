@@ -147,3 +147,13 @@ CSRF_TRUSTED_ORIGINS = ['https://projeto-perfumaria-python.onrender.com']
 
 # Se você tiver que adicionar subdomínios, pode usar um wildcard:
 # CSRF_TRUSTED_ORIGINS = ['https://*.onrender.com']
+
+# CONFIGURAÇÕES DE COOKIES PARA PRODUÇÃO (Obrigatório em HTTPS/Render)
+# Força o uso de cookies de sessão seguros (somente HTTPS).
+SESSION_COOKIE_SECURE = True
+
+# Força o uso de cookies de CSRF seguros (somente HTTPS).
+CSRF_COOKIE_SECURE = True
+
+# Diz ao Django para confiar nos cabeçalhos 'X-Forwarded-Proto' do Render (HTTPS)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

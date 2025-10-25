@@ -29,7 +29,7 @@ ALLOWED_HOSTS = [
     '.onrender.com', # Permite todos os subdomínios .onrender.com
     'localhost', # Para testes locais
     '127.0.0.1', # Para testes locais
-
+]
 
 # Application definition
 

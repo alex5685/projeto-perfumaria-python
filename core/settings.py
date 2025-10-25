@@ -25,7 +25,10 @@ SECRET_KEY = "cCRnpmq9bxcH9fQQ_STL452iI9XTYOYcOaZIaPwN_t0TdI2coe9KgwzBFTtChwGBMt
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['perfumaria-django.onrender.com', '.onrender.com', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = [
+    '.onrender.com', # Permite todos os subdomínios .onrender.com
+    'localhost', # Para testes locais
+    '127.0.0.1', # Para testes locais
 
 
 # Application definition

@@ -26,6 +26,9 @@ COPY . /app/
 # Como ele é RUN, ele ocorre durante o processo de build do Docker.
 RUN python manage.py collectstatic --noinput
 
+# 6A. EXECUÇÃO DAS MIGRAÇÕES (!!! ESSA É A NOVA LINHA !!!)
+RUN python manage.py migrate
+
 # 7. COMANDO DE EXECUÇÃO (START/CMD)
 # O CMD mais portátil: executa o Gunicorn como um módulo Python (python -m),
 # ignorando problemas de PATH (Status 127).

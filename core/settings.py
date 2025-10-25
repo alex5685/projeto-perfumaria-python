@@ -157,3 +157,28 @@ CSRF_COOKIE_SECURE = True
 
 # Diz ao Django para confiar nos cabeçalhos 'X-Forwarded-Proto' do Render (HTTPS)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# settings.py
+import os # Já deve estar lá
+import dj_database_url # Importar o novo modulo
+
+# ... o restante do seu settings.py
+
+# CONFIGURAÇÃO DE BANCO DE DADOS (USANDO VARIAVEL DE AMBIENTE)
+if 'DATABASE_URL' in os.environ:
+    # Em produção (Render), usa a variavel DATABASE_URL para PostgreSQL
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.environ.get('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+else:
+    # Localmente (sem a variavel), usa SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
+    }

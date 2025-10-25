@@ -3,6 +3,8 @@ Pillow
 gunicorn
 whitenoise
 requests
+psycopg2-binary # Driver para PostgreSQL
+dj-database-url # Facilita a leitura da variavel DATABASE_URL
 # Adicione outros pacotes do seu projeto que você usa (ex:
 # django-debug-toolbar
 # python-decouple

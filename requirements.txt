@@ -2,8 +2,8 @@ Django
 Pillow
 gunicorn
 whitenoise
+requests
 # Adicione outros pacotes do seu projeto que você usa (ex:
 # django-debug-toolbar
-# requests
 # python-decouple
 # etc.)

@@ -141,3 +141,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # O prefixo da URL para acessar esses arquivos (ex: http://127.0.0.1:8000/media/Azzaro.png)
 MEDIA_URL = '/media/'
+
+# Adicione a URL base do seu serviço Render à lista de origens confiáveis
+CSRF_TRUSTED_ORIGINS = ['https://projeto-perfumaria-python.onrender.com']
+
+# Se você tiver que adicionar subdomínios, pode usar um wildcard:
+# CSRF_TRUSTED_ORIGINS = ['https://*.onrender.com']

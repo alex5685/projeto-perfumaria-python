@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "loja",
+    "storages",
 ]
 # core/settings.py
 
@@ -182,3 +183,29 @@ else:
             'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
         }
     }
+# CONFIGURAÇÕES DO AWS S3 (PARA ARQUIVOS DE MÍDIA)
+
+# Lê variáveis de ambiente do Render
+AWS_S3_REGION_NAME = os.environ.get('AWS_REGION_NAME')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+
+# Se as variáveis S3 estiverem definidas (ou seja, em producao)
+if AWS_STORAGE_BUCKET_NAME: 
+
+    # Define o S3 como o local padrão para upload de arquivos
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3.S3Storage'
+
+    # Configurações de acesso e segurança
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_DEFAULT_ACL = 'public-read' # Permite que as fotos sejam visíveis
+
+    # Monta o domínio completo para que o Django use para servir as fotos
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+
+    # A URL que os templates usarão para buscar as fotos
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+
+else:
+    # Configuração de fallback para desenvolvimento local
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

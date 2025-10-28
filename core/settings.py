@@ -103,7 +103,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CSRF_TRUSTED_ORIGINS = ['https://projeto-perfumaria-python.onrender.com']
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'httpss')
+# CORRIGIDO: O valor deve ser 'https' (um 's' apenas)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # CONFIGURAÇÕES DO AWS S3 (PARA ARQUIVOS DE MÍDIA)

@@ -143,8 +143,8 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # CONFIGURAÇÕES DO AWS S3 (PARA ARQUIVOS DE MÍDIA)
 
 # Lê variáveis de ambiente do Render
-AWS_S3_REGION_NAME = os.environ.get('AWS_REGION_NAME')
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME = 'us-east-2' # <-- Força a região correta
+AWS_STORAGE_BUCKET_NAME = 'perfumaria-fotos-alex'
 
 # Se as variáveis S3 estiverem definidas (ou seja, em producao)
 if AWS_STORAGE_BUCKET_NAME: 

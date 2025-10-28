@@ -55,7 +55,7 @@ ROOT_URLCONF = "core.urls"
 
 TEMPLATES = [
     {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "BACKEND": "django.template.backends.django.Templates",
         "DIRS": [],
         "APP_DIRS": True,
         "OPTIONS": {
@@ -142,25 +142,24 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # CONFIGURAÇÕES DO AWS S3 (PARA ARQUIVOS DE MÍDIA)
 
-# Leitura explícita das chaves (necessária para clareza, mas o boto3 lê automaticamente)
+# 1. Leitura Explícita das Chaves de Acesso
+# Mantemos a leitura explícita para garantir, embora o Boto3 as leia automaticamente do ambiente Render.
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 
-# Leitura das variáveis de ambiente restantes
-# IMPORTANTE: Força a região correta para evitar erros de endpoint (Alternativa 3)
-AWS_S3_REGION_NAME = 'us-east-2' 
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', 'perfumaria-fotos-alex')
-AWS_LOCATION = 'media' # Prefixo para a URL (ex: bucket-name.s3.com/media/produtos/...)
+# Força a região correta (us-east-2) e o nome do bucket
+AWS_S3_REGION_NAME = 'us-east-2' # Força a região correta (Alternativa 3)
+AWS_STORAGE_BUCKET_NAME = 'perfumaria-fotos-alex'
+AWS_LOCATION = 'media' # Prefixo para o caminho dos arquivos no S3
 
-
-# Se as variáveis S3 estiverem definidas (ou seja, em producao)
-if AWS_STORAGE_BUCKET_NAME: 
+# Se as variáveis S3 estiverem definidas (em produção)
+if AWS_STORAGE_BUCKET_NAME:
     
     # Define o S3 como o local padrão para upload de arquivos (usando a classe mais moderna)
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     
-    # Parâmetro ACL Obrigatório para Propriedade do Objeto, respeitando as ACLs desativadas do S3.
-    AWS_S3_OBJECT_PARAMETERS = {'ACL': 'bucket-owner-full-control'}
+    # CRUCIAL: Força a ACL 'public-read'. ISSO REQUER ACLs HABILITADAS no bucket S3.
+    AWS_S3_OBJECT_PARAMETERS = {'ACL': 'public-read'} # <--- CORREÇÃO FINAL PARA LEITURA
     
     # Configurações de acesso e segurança
     AWS_S3_FILE_OVERWRITE = False
@@ -168,8 +167,8 @@ if AWS_STORAGE_BUCKET_NAME:
     # Monta o domínio completo para que o Django use para servir as fotos
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
     
-    # A URL que os templates usarão para buscar as fotos
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
+    # A URL que os templates usarão (incluindo o prefixo media/)
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/' 
 
 else:
     # Configuração de fallback para desenvolvimento local

@@ -118,19 +118,20 @@ AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 
 # Leitura das variáveis de ambiente restantes
-AWS_S3_REGION_NAME = os.environ.get('AWS_REGION_NAME')
+# 5. CORREÇÃO DA REGIÃO: Prioriza AWS_DEFAULT_REGION, o padrão do Boto3.
+AWS_S3_REGION_NAME = os.environ.get('AWS_DEFAULT_REGION', os.environ.get('AWS_REGION_NAME')) 
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 
-# 3. NOVO: Define o caminho interno dentro do bucket (e corrige o problema de caminho)
+# 4. Define o caminho interno dentro do bucket
 AWS_LOCATION = 'media'
 
 # Se as variáveis S3 estiverem definidas (ou seja, em producao)
-if AWS_STORAGE_BUCKET_NAME: 
+if AWS_STORAGE_BUCKET_NAME and AWS_S3_REGION_NAME: 
     
     # 2. Mudar o Backend de Storage para S3Boto3Storage
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     
-    # 4. Parâmetro ACL Obrigatório para Propriedade do Objeto
+    # 3. Parâmetro ACL Obrigatório para Propriedade do Objeto
     AWS_S3_OBJECT_PARAMETERS = {'ACL': 'bucket-owner-full-control'}
     
     # Configurações de acesso e segurança

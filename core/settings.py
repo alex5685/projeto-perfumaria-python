@@ -10,7 +10,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # Quick-start development settings - unsuitable for production
+
+# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get("SECRET_KEY", "cCRnpmq9bxcH9fQQ_STL452iI9XTYOYcOaZIaPwN_t0TdI2coe9KgwzBFTtChwGBMtA") 
+
+# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True 
 ALLOWED_HOSTS = [
     '.onrender.com', 
@@ -117,13 +121,16 @@ AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 AWS_S3_REGION_NAME = os.environ.get('AWS_REGION_NAME')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
 
+# 3. NOVO: Define o caminho interno dentro do bucket (e corrige o problema de caminho)
+AWS_LOCATION = 'media'
+
 # Se as variáveis S3 estiverem definidas (ou seja, em producao)
 if AWS_STORAGE_BUCKET_NAME: 
     
     # 2. Mudar o Backend de Storage para S3Boto3Storage
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     
-    # 3. Parâmetro ACL Obrigatório para Propriedade do Objeto
+    # 4. Parâmetro ACL Obrigatório para Propriedade do Objeto
     AWS_S3_OBJECT_PARAMETERS = {'ACL': 'bucket-owner-full-control'}
     
     # Configurações de acesso e segurança
@@ -132,8 +139,8 @@ if AWS_STORAGE_BUCKET_NAME:
     # Monta o domínio completo
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
     
-    # A URL que os templates usarão para buscar as fotos
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    # A URL que os templates usarão (USA o AWS_LOCATION)
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/' 
 
 else:
     # Configuração de fallback para desenvolvimento local

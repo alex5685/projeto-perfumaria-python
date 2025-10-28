@@ -5,7 +5,23 @@ import os
 from pathlib import Path
 import dj_database_url # Necessário para ler a DATABASE_URL
 # from decouple import config # Comentado, use se for usar django-decouple
+# settings.py (Apenas o trecho que muda)
 
+# Se as variáveis S3 estiverem definidas (ou seja, em producao)
+if AWS_STORAGE_BUCKET_NAME: 
+    
+    # Define o S3 como o local padrão para upload de arquivos
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3.S3Storage'
+    
+    # NOVO: Parâmetros que são enviados com cada upload de arquivo.
+    # Isso instrui o S3 a aplicar a ACL 'bucket-owner-full-control', 
+    # que é a ACL padrão quando ACLs estão desativadas (Imposto pelo Proprietário).
+    AWS_S3_OBJECT_PARAMETERS = {'ACL': 'bucket-owner-full-control'} # <--- ADICIONE ESTA LINHA
+    
+    # Configurações de acesso e segurança
+    AWS_S3_FILE_OVERWRITE = False
+    
+    # ... o restante do código
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -166,3 +182,4 @@ else:
     # Configuração de fallback para desenvolvimento local
     MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+

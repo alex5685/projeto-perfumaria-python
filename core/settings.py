@@ -159,7 +159,7 @@ if AWS_STORAGE_BUCKET_NAME:
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     
     # CRUCIAL: Força a ACL 'public-read'. ISSO REQUER ACLs HABILITADAS no bucket S3.
-    AWS_S3_OBJECT_PARAMETERS = {'ACL': 'public-read'} # <--- CORREÇÃO FINAL PARA LEITURA
+    AWS_S3_OBJECT_PARAMETERS = {'ACL': 'bucket-owner-full-control'}
     
     # Configurações de acesso e segurança
     AWS_S3_FILE_OVERWRITE = False

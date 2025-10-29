@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Chave Secreta: Lida de forma segura via variável de ambiente no Render.
 SECRET_KEY = os.environ.get("SECRET_KEY", "cCRnpmq9bxcH9fQQ_STL452iI9XTYOYcOaZIaPwN_t0TdI2coe9KgwzBFTtChwGBMtA") 
 
-# DEBUG: Lida de forma segura via variável de ambiente. Mantenha 'True' no padrão para ver erros em detalhes no Render.
+# DEBUG: Lida de forma segura via variável de ambiente.
 DEBUG = os.environ.get("DEBUG", "True") == "True" 
 
 ALLOWED_HOSTS = [
@@ -45,6 +45,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware", # CORREÇÃO: Para servir estáticos
 ]
 
 ROOT_URLCONF = "core.urls"
@@ -52,7 +53,7 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, 'templates')],
+        "DIRS": [os.path.join(BASE_DIR, 'templates')], # Re-adicionado para garantir
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -69,18 +70,16 @@ WSGI_APPLICATION = "core.wsgi.application"
 
 
 # Database
-# Configuração para usar o banco de dados do Render ou o local.
 DATABASES = {
     'default': dj_database_url.config(
-        default='sqlite:///db.sqlite3',
-        conn_max_age=600
+        default=os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3'),
+        conn_max_age=600,
+        conn_health_checks=True,
     )
 }
 
 
 # Password validation
-# https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -98,14 +97,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/5.0/topics/i18n/
-
 LANGUAGE_CODE = "en-us"
-
-TIME_ZONE = "America/Sao_Paulo" # Alterado para o fuso horário de São Paulo, mais comum
-
+TIME_ZONE = "America/Sao_Paulo" # Fuso horário brasileiro
 USE_I18N = True
-
 USE_TZ = True
 
 
@@ -132,7 +126,6 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # CONFIGURAÇÕES DO AWS S3 (PARA ARQUIVOS DE MÍDIA)
-# As chaves AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY são lidas automaticamente pelo Boto3
 
 # Força a região correta (us-east-2) e o nome do bucket
 AWS_S3_REGION_NAME = 'us-east-2' 
@@ -142,21 +135,19 @@ AWS_LOCATION = 'media' # Prefixo para o caminho dos arquivos no S3
 # Se o nome do bucket estiver definido (em produção)
 if AWS_STORAGE_BUCKET_NAME:
     
-    # Define o S3 como o local padrão para upload de arquivos
-    # Usando a classe mais moderna do django-storages
+    # Define o S3 como o local padrão para upload de arquivos (usando a classe moderna)
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     
-    # CRUCIAL: Tenta a ACL 'bucket-owner-full-control' para resolver o AccessDenied 
-    # causado pelo bloqueio de ACLs públicas no S3.
-    AWS_S3_OBJECT_PARAMETERS = {'ACL': 'bucket-owner-full-control'} 
+    # ÚLTIMA TENTATIVA: Voltamos para 'public-read' APÓS desativar o bloqueio de ACLs no S3.
+    AWS_S3_OBJECT_PARAMETERS = {'ACL': 'public-read'} 
     
     # Configurações de acesso e segurança
     AWS_S3_FILE_OVERWRITE = False
     
-    # Monta o domínio completo para que o Django use para servir as fotos
+    # Monta o domínio completo
     AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
     
-    # A URL que os templates usarão para as fotos
+    # A URL que os templates usarão
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/'
 
 else:

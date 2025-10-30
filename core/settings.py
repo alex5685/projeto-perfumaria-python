@@ -1,15 +1,18 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-
-# Carrega variáveis de ambiente (.env)
-load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me")
-DEBUG = os.getenv("DEBUG", "False") == "True"
-ALLOWED_HOSTS = ["projeto-perfumaria-python.onrender.com", "localhost", "127.0.0.1"]
+# ---------------------------------------------------------------------
+# SEGREDOS / DEBUG / HOSTS
+# ---------------------------------------------------------------------
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "change-me")
+DEBUG = os.environ.get("DEBUG", "False") == "True"
+ALLOWED_HOSTS = [
+    "projeto-perfumaria-python.onrender.com",
+    "localhost",
+    "127.0.0.1",
+]
 
 # ---------------------------------------------------------------------
 # SEGURANÇA / PROXY / CSRF
@@ -18,14 +21,13 @@ CSRF_TRUSTED_ORIGINS = [
     "https://projeto-perfumaria-python.onrender.com",
     "https://*.onrender.com",
 ]
-
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 # ---------------------------------------------------------------------
-# APLICAÇÕES
+# APPS
 # ---------------------------------------------------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -34,8 +36,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "loja",  # seu app principal
-    "storages",  # para integração com S3
+    "loja",
+    "storages",  # S3
 ]
 
 # ---------------------------------------------------------------------
@@ -43,7 +45,7 @@ INSTALLED_APPS = [
 # ---------------------------------------------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # mantém os estáticos no Render
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -73,7 +75,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 # ---------------------------------------------------------------------
-# BANCO DE DADOS
+# DB (mantenho sqlite; se usar Postgres do Render, troque aqui)
 # ---------------------------------------------------------------------
 DATABASES = {
     "default": {
@@ -83,7 +85,7 @@ DATABASES = {
 }
 
 # ---------------------------------------------------------------------
-# ARMAZENAMENTO ESTÁTICO (Render + WhiteNoise)
+# ESTÁTICOS / MÍDIA (WhiteNoise + S3 para uploads)
 # ---------------------------------------------------------------------
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -93,21 +95,20 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # ---------------------------------------------------------------------
-# AWS S3 CONFIG (django-storages)
+# AWS S3 (django-storages)
 # ---------------------------------------------------------------------
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "perfumaria-fotos-alex")
-AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-2")
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME", "perfumaria-fotos-alex")
+AWS_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-2")
 
 AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_DEFAULT_REGION}.amazonaws.com"
 AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
 
-# django-storages backend
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
 # ---------------------------------------------------------------------
-# INTERNACIONALIZAÇÃO
+# I18N
 # ---------------------------------------------------------------------
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"
@@ -115,12 +116,9 @@ USE_I18N = True
 USE_TZ = True
 
 # ---------------------------------------------------------------------
-# LOGIN / LOGOUT
+# LOGIN
 # ---------------------------------------------------------------------
 LOGIN_REDIRECT_URL = "/admin/"
 LOGOUT_REDIRECT_URL = "/admin/login/"
 
-# ---------------------------------------------------------------------
-# CONFIGURAÇÃO FINAL
-# ---------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

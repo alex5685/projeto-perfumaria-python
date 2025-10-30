@@ -1,175 +1,236 @@
 import os
-import json
+import datetime as dt
+
 import boto3
-from botocore.client import Config
+from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
+
 from django.conf import settings
-from django.http import JsonResponse
-from django.views.decorators.http import require_GET
+from django.http import JsonResponse, HttpResponseForbidden
+from django.contrib.auth import get_user_model
 
-# Helpers seguros para região/bucket
-def _env_region():
-    # 1) env, 2) settings alias, 3) settings principal, 4) fallback
-    return (
-        os.getenv("AWS_DEFAULT_REGION")
-        or os.getenv("AWS_REGION")
-        or getattr(settings, "AWS_S3_REGION_NAME", None)
-        or getattr(settings, "AWS_DEFAULT_REGION", None)
-        or "us-east-2"
-    )
 
-def _bucket():
-    return (
-        os.getenv("AWS_STORAGE_BUCKET_NAME")
-        or getattr(settings, "AWS_STORAGE_BUCKET_NAME", "")
-    )
+# =========================
+# Helpers & Constantes
+# =========================
 
-def _s3_client(region=None):
-    region = region or _env_region()
+def _get_region() -> str:
+    """
+    Região, com ordem de precedência:
+    1) settings.AWS_DEFAULT_REGION
+    2) env AWS_DEFAULT_REGION
+    3) 'us-east-2' (padrão do seu bucket)
+    """
+    return getattr(settings, "AWS_DEFAULT_REGION", None) or \
+           os.getenv("AWS_DEFAULT_REGION") or "us-east-2"
+
+
+REGION = _get_region()
+BUCKET = getattr(settings, "AWS_STORAGE_BUCKET_NAME", os.getenv("AWS_STORAGE_BUCKET_NAME", ""))
+PREFIX = "media/produtos/"  # onde salvamos arquivos de diagnóstico
+
+
+def _s3_client():
+    """
+    Cria um boto3.client('s3') respeitando região e timeouts razoáveis.
+    """
+    cfg = Config(region_name=REGION, retries={"max_attempts": 3, "mode": "standard"})
     return boto3.client(
         "s3",
-        region_name=region,
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID", getattr(settings, "AWS_ACCESS_KEY_ID", "")),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY", getattr(settings, "AWS_SECRET_ACCESS_KEY", "")),
-        config=Config(s3={"addressing_style": "virtual"}),
+        region_name=REGION,
+        config=cfg,
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
     )
 
-@require_GET
+
+def _obj_url(key: str) -> str:
+    """
+    Monta URL pública padrão do S3 (path-style por região):
+    https://{bucket}.s3.{region}.amazonaws.com/{key}
+    """
+    return f"https://{BUCKET}.s3.{REGION}.amazonaws.com/{key}"
+
+
+# =========================
+# Views de Diagnóstico S3
+# =========================
+
 def whoami_s3(request):
+    """
+    Retorna a identidade (STS) das credenciais em uso pelo servidor.
+    Útil para detectar credenciais erradas/expiradas.
+    """
     try:
         sts = boto3.client(
             "sts",
-            region_name=_env_region(),
-            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID", getattr(settings, "AWS_ACCESS_KEY_ID", "")),
-            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY", getattr(settings, "AWS_SECRET_ACCESS_KEY", "")),
+            region_name=REGION,
+            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
         )
-        ident = sts.get_caller_identity()
-        return JsonResponse({"ok": True, **ident})
+        resp = sts.get_caller_identity()
+        return JsonResponse({"ok": True, **resp})
     except Exception as e:
-        return JsonResponse({"ok": False, "error": str(e)})
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
-@require_GET
-def s3_put(request):
-    try:
-        region = _env_region()
-        bucket = _bucket()
-        key = "media/produtos/_diag.txt"
-        body = f"ok {_env_region()}".encode()
 
-        s3 = _s3_client(region)
-        s3.put_object(Bucket=bucket, Key=key, Body=body, ContentType="text/plain")
-
-        url = f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
-        return JsonResponse({"ok": True, "url": url, "key": key})
-    except Exception as e:
-        return JsonResponse({"ok": False, "error": str(e)})
-
-@require_GET
-def s3_list(request):
-    try:
-        region = _env_region()
-        bucket = _bucket()
-        prefix = "media/produtos/"
-        s3 = _s3_client(region)
-
-        keys = []
-        paginator = s3.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-            for item in page.get("Contents", []):
-                keys.append(item["Key"])
-
-        return JsonResponse({"ok": True, "count": len(keys), "keys": keys})
-    except Exception as e:
-        return JsonResponse({"ok": False, "error": str(e)})
-
-@require_GET
-def probe_s3(request):
-    # PUT de um arquivo com timestamp — simples para validar escrita
-    try:
-        region = _env_region()
-        bucket = _bucket()
-        key = "media/produtos/_diag_runtime.txt"
-        body = f"written at runtime (region={region})".encode()
-
-        s3 = _s3_client(region)
-        s3.put_object(Bucket=bucket, Key=key, Body=body, ContentType="text/plain")
-        url = f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
-        return JsonResponse({"ok": True, "url": url})
-    except Exception as e:
-        return JsonResponse({"ok": False, "error": str(e)})
-
-@require_GET
 def s3_diag(request):
-    """Diagnóstico encadeado: STS → localização → HEAD no bucket → PUT → LIST"""
+    """
+    Pipeline completo de diagnóstico:
+      1) STS get_caller_identity
+      2) bucket location
+      3) head_bucket
+      4) put objeto de runtime
+      5) list prefix
+    """
     out = {"ok": True, "env": {
-        "AWS_ACCESS_KEY_ID": f"{os.getenv('AWS_ACCESS_KEY_ID','')[:4]}***",
-        "AWS_SECRET_ACCESS_KEY": "***" if os.getenv("AWS_SECRET_ACCESS_KEY") else "",
+        "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID", "")[:4] + "****" if os.getenv("AWS_ACCESS_KEY_ID") else "",
+        "AWS_SECRET_ACCESS_KEY": "****" if os.getenv("AWS_SECRET_ACCESS_KEY") else "",
         "AWS_DEFAULT_REGION env": os.getenv("AWS_DEFAULT_REGION"),
-    }, "settings": {
-        "AWS_STORAGE_BUCKET_NAME": getattr(settings, "AWS_STORAGE_BUCKET_NAME", "<missing>"),
-        "AWS_DEFAULT_REGION": getattr(settings, "AWS_DEFAULT_REGION", "<missing>"),
-    }, "DEBUG": settings.DEBUG}
+        "region": REGION,
+        "bucket": BUCKET,
+    }}
+    s3 = _s3_client()
 
-    region = _env_region()
-    bucket = _bucket()
-    out["region"] = region
-    out["bucket"] = bucket
-
+    # 1) STS
     try:
-        sts = boto3.client(
-            "sts",
-            region_name=region,
-            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID", getattr(settings, "AWS_ACCESS_KEY_ID", "")),
-            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY", getattr(settings, "AWS_SECRET_ACCESS_KEY", "")),
-        )
-        ident = sts.get_caller_identity()
-        out["checks"] = [{"step": "sts.get_caller_identity", "ok": True, "identity": ident}]
+        sts = boto3.client("sts", region_name=REGION)
+        idt = sts.get_caller_identity()
+        out["checks"] = [{"step": "sts.get_caller_identity", "ok": True, "identity": idt}]
     except Exception as e:
         out["ok"] = False
         out["checks"] = [{"step": "sts.get_caller_identity", "ok": False, "error": str(e)}]
-        return JsonResponse(out)
+        return JsonResponse(out, status=500)
 
-    s3 = _s3_client(region)
-
-    # get_bucket_location
+    # 2) location
     try:
-        loc = s3.get_bucket_location(Bucket=bucket)
-        out["checks"].append({"step": "s3.get_bucket_location", "ok": True, "bucket_location": loc})
+        loc = s3.get_bucket_location(Bucket=BUCKET)
+        out["bucket_location"] = loc
     except Exception as e:
         out["ok"] = False
-        out["checks"].append({"step": "s3.get_bucket_location", "ok": False, "error": str(e)})
-        return JsonResponse(out)
+        out["bucket_location"] = {"ok": False, "error": str(e)}
+        return JsonResponse(out, status=500)
 
-    # head_bucket
+    # 3) head_bucket
     try:
-        hb = s3.head_bucket(Bucket=bucket)
-        out["checks"].append({"step": "s3.head_bucket", "ok": True})
+        s3.head_bucket(Bucket=BUCKET)
+        out.setdefault("steps", []).append({"step": "s3.head_bucket", "ok": True})
     except Exception as e:
         out["ok"] = False
-        out["checks"].append({"step": "s3.head_bucket", "ok": False, "error": str(e)})
-        return JsonResponse(out)
+        out.setdefault("steps", []).append({"step": "s3.head_bucket", "ok": False, "error": str(e)})
+        return JsonResponse(out, status=500)
 
-    # put + list
+    # 4) put object (runtime txt)
+    key = f"{PREFIX}_diag_runtime.txt"
+    body = f"diag @ {dt.datetime.utcnow().isoformat()}Z\nregion={REGION}\n"
     try:
-        key = "media/produtos/_diag_runtime.txt"
-        body = f"diag write (region={region})".encode()
-        s3.put_object(Bucket=bucket, Key=key, Body=body, ContentType="text/plain")
-        url = f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
-        out["checks"].append({"step": "s3.put_object", "key": key, "ok": True, "url": url})
+        s3.put_object(Bucket=BUCKET, Key=key, Body=body.encode("utf-8"), ContentType="text/plain")
+        out["steps"].append({"step": "s3.put_object", "key": key, "ok": True, "url": _obj_url(key)})
     except Exception as e:
         out["ok"] = False
-        out["checks"].append({"step": "s3.put_object", "ok": False, "error": str(e)})
-        return JsonResponse(out)
+        out["steps"].append({"step": "s3.put_object", "key": key, "ok": False, "error": str(e)})
+        return JsonResponse(out, status=500)
 
+    # 5) list prefix
     try:
-        prefix = "media/produtos/"
-        keys = []
-        paginator = s3.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-            for item in page.get("Contents", []):
-                keys.append(item["Key"])
-        out["checks"].append({"step": "s3.list_objects_v2", "prefix": prefix, "ok": True, "count": len(keys), "keys": keys[:10]})
+        res = s3.list_objects_v2(Bucket=BUCKET, Prefix=PREFIX)
+        keys = [obj["Key"] for obj in res.get("Contents", [])]
+        out["steps"].append({"step": "s3.list_objects_v2", "prefix": PREFIX, "ok": True, "count": len(keys), "keys": keys})
     except Exception as e:
         out["ok"] = False
-        out["checks"].append({"step": "s3.list_objects_v2", "ok": False, "error": str(e)})
+        out["steps"].append({"step": "s3.list_objects_v2", "ok": False, "error": str(e)})
+        return JsonResponse(out, status=500)
 
     return JsonResponse(out)
+
+
+def s3_put(request):
+    """
+    Grava (ou sobrescreve) um arquivo fixo de diagnóstico.
+    """
+    key = f"{PREFIX}_diag.txt"
+    body = f"_diag written at {dt.datetime.utcnow().isoformat()}Z"
+    try:
+        s3 = _s3_client()
+        s3.put_object(Bucket=BUCKET, Key=key, Body=body.encode("utf-8"), ContentType="text/plain")
+        return JsonResponse({"ok": True, "url": _obj_url(key), "key": key})
+    except (BotoCoreError, ClientError) as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
+def probe_s3(request):
+    """
+    Grava um arquivo cujo nome muda a cada chamada (_diag_runtime.txt)
+    apenas para validar escrita.
+    """
+    key = f"{PREFIX}_diag_runtime.txt"
+    body = f"probe @ {dt.datetime.utcnow().isoformat()}Z"
+    try:
+        s3 = _s3_client()
+        s3.put_object(Bucket=BUCKET, Key=key, Body=body.encode("utf-8"), ContentType="text/plain")
+        return JsonResponse({"ok": True, "url": _obj_url(key)})
+    except (BotoCoreError, ClientError) as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
+def s3_list(request):
+    """
+    Lista os objetos em media/produtos/.
+    """
+    try:
+        s3 = _s3_client()
+        res = s3.list_objects_v2(Bucket=BUCKET, Prefix=PREFIX)
+        keys = [c["Key"] for c in res.get("Contents", [])]
+        return JsonResponse({"ok": True, "count": len(keys), "keys": keys})
+    except (BotoCoreError, ClientError) as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
+# =========================
+# Bootstrap temporário do Admin
+# =========================
+
+def admin_bootstrap(request):
+    """
+    Cria/atualiza um superusuário, protegido por token de manutenção.
+    Exemplo:
+      /admin-bootstrap/?token=SEU_TOKEN&u=alex5685&p=NovaSenhaF0rte!&e=alex@exemplo.com
+
+    Após usar, REMOVA:
+      - esta rota de urls.py
+      - esta função de views.py
+      - a env var ADMIN_MAINT_TOKEN
+    """
+    token = request.GET.get("token")
+    if not token or token != getattr(settings, "ADMIN_MAINT_TOKEN", ""):
+        return HttpResponseForbidden("forbidden")
+
+    username = request.GET.get("u", "admin")
+    password = request.GET.get("p")
+    email = request.GET.get("e", f"{username}@example.com")
+
+    if not password:
+        return JsonResponse({"ok": False, "error": "missing 'p' (password)"}, status=400)
+
+    User = get_user_model()
+    user, created = User.objects.get_or_create(username=username, defaults={"email": email})
+    user.is_staff = True
+    user.is_superuser = True
+    user.set_password(password)
+    user.save()
+
+    return JsonResponse({
+        "ok": True,
+        "action": "created" if created else "updated",
+        "user": username,
+        "is_superuser": user.is_superuser,
+        "is_staff": user.is_staff,
+    })
+
+
+# =========================
+# Healthcheck
+# =========================
+
+def healthz(request):
+    return JsonResponse({"ok": True, "status": "up"})

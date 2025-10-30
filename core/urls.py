@@ -66,7 +66,7 @@ urlpatterns = [
     path('probe-s3/', probe_s3),
     path('s3-put/', s3_put),
     path('s3-list/', s3_list),
-
+    path("s3-diag/", views.s3_diag, name="s3-diag"),
     # suas rotas de app (ex.: loja) se existirem:
     # path('', include('loja.urls')),
 ]

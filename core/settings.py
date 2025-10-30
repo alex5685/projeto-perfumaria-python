@@ -1,16 +1,32 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Carrega variáveis de ambiente (.env)
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
-DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me")
+DEBUG = os.getenv("DEBUG", "False") == "True"
+ALLOWED_HOSTS = ["projeto-perfumaria-python.onrender.com", "localhost", "127.0.0.1"]
 
-ALLOWED_HOSTS = [
-    *[h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()],
-    "localhost", "127.0.0.1",
+# ---------------------------------------------------------------------
+# SEGURANÇA / PROXY / CSRF
+# ---------------------------------------------------------------------
+CSRF_TRUSTED_ORIGINS = [
+    "https://projeto-perfumaria-python.onrender.com",
+    "https://*.onrender.com",
 ]
 
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+# ---------------------------------------------------------------------
+# APLICAÇÕES
+# ---------------------------------------------------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -18,12 +34,16 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # sua app:
-    "loja",
+    "loja",  # seu app principal
+    "storages",  # para integração com S3
 ]
 
+# ---------------------------------------------------------------------
+# MIDDLEWARE
+# ---------------------------------------------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # mantém os estáticos no Render
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -52,71 +72,55 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "core.wsgi.application"
 
-# Banco de dados (Render → variáveis de ambiente já apontam)
-DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL:
-    # dj-database-url não é estritamente necessário aqui; use seu config atual se preferir
-    import dj_database_url
-    DATABASES = {
-        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+# ---------------------------------------------------------------------
+# BANCO DE DADOS
+# ---------------------------------------------------------------------
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+}
 
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-]
+# ---------------------------------------------------------------------
+# ARMAZENAMENTO ESTÁTICO (Render + WhiteNoise)
+# ---------------------------------------------------------------------
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# ---------------------------------------------------------------------
+# AWS S3 CONFIG (django-storages)
+# ---------------------------------------------------------------------
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "perfumaria-fotos-alex")
+AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-2")
+
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_DEFAULT_REGION}.amazonaws.com"
+AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+
+# django-storages backend
+DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+# ---------------------------------------------------------------------
+# INTERNACIONALIZAÇÃO
+# ---------------------------------------------------------------------
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True
 USE_TZ = True
 
-# STATIC & MEDIA
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+# ---------------------------------------------------------------------
+# LOGIN / LOGOUT
+# ---------------------------------------------------------------------
+LOGIN_REDIRECT_URL = "/admin/"
+LOGOUT_REDIRECT_URL = "/admin/login/"
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
-
-# ---------- S3 / boto3 ----------
-# Estes três devem existir no Render
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "")
-
-# A REGIÃO era o que faltava no settings
-AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-2")  # Ohio (igual ao console)
-# Muitos pacotes esperam este alias:
-AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", AWS_DEFAULT_REGION)
-
-# Opcionalmente, para URLs públicas legíveis e sem assinatura
-AWS_QUERYSTRING_AUTH = False
-AWS_S3_ADDRESSING_STYLE = "virtual"
-
-# Se você usa django-storages (FileSystem local para estático e S3 p/ media)
-USE_S3_FOR_MEDIA = True
-if USE_S3_FOR_MEDIA and AWS_STORAGE_BUCKET_NAME:
-    STORAGES = {
-        "default": {
-            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        },
-    }
-    # Pasta de mídia dentro do bucket
-    AWS_LOCATION = "media"
-    AWS_DEFAULT_ACL = None
-    # (o path “media/” é tratado na aplicação; as views que criamos já usam media/produtos/)
-# ---------- /S3 ----------
-
+# ---------------------------------------------------------------------
+# CONFIGURAÇÃO FINAL
+# ---------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

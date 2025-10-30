@@ -1,39 +1,76 @@
-# core/urls.py
-from django.urls import path
+from django.contrib import admin
+from django.urls import path, include
 from django.http import JsonResponse
 from django.conf import settings
-import boto3, botocore
+from django.conf.urls.static import static
 
-def s3_list(request):
-    s3 = boto3.client("s3", region_name=settings.AWS_S3_REGION_NAME)
-    try:
-        resp = s3.list_objects_v2(
-            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Prefix=f"{settings.AWS_LOCATION}/produtos/"
-        )
-        keys = [x["Key"] for x in resp.get("Contents", [])]
-        return JsonResponse({"ok": True, "count": len(keys), "keys": keys})
-    except botocore.exceptions.ClientError as e:
-        return JsonResponse({"ok": False, "where": "list", "error": str(e)}, status=500)
+# ---- Endpoints de diagnóstico S3 (opcionais em produção) ----
+import boto3
+from botocore.exceptions import ClientError
 
-def s3_put(request):
-    s3 = boto3.client("s3", region_name=settings.AWS_S3_REGION_NAME)
-    key = f"{settings.AWS_LOCATION}/produtos/_diag.txt"
+def whoami_s3(request):
     try:
+        sts = boto3.client("sts", region_name=settings.AWS_DEFAULT_REGION)
+        return JsonResponse(sts.get_caller_identity())
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+def probe_s3(request):
+    try:
+        s3 = boto3.client("s3", region_name=settings.AWS_DEFAULT_REGION)
+        key = "media/produtos/_probe.txt"
         s3.put_object(
             Bucket=settings.AWS_STORAGE_BUCKET_NAME,
             Key=key,
-            Body=b"hello from putobject",
-            ContentType="text/plain"
+            Body=b"ok",
+            ContentType="text/plain",
+            ACL="public-read",
         )
-        url = f"https://{settings.AWS_STORAGE_BUCKET_NAME}.s3.{settings.AWS_S3_REGION_NAME}.amazonaws.com/{key}"
+        url = f"https://{settings.AWS_STORAGE_BUCKET_NAME}.s3.{settings.AWS_DEFAULT_REGION}.amazonaws.com/{key}"
         return JsonResponse({"ok": True, "url": url, "key": key})
-    except botocore.exceptions.ClientError as e:
-        return JsonResponse({"ok": False, "where": "put", "error": str(e)}, status=500)
+    except ClientError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+def s3_put(request):
+    try:
+        s3 = boto3.client("s3", region_name=settings.AWS_DEFAULT_REGION)
+        key = "media/produtos/_diag.txt"
+        s3.put_object(
+            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+            Key=key,
+            Body=b"diag",
+            ContentType="text/plain",
+            ACL="public-read",
+        )
+        url = f"https://{settings.AWS_STORAGE_BUCKET_NAME}.s3.{settings.AWS_DEFAULT_REGION}.amazonaws.com/{key}"
+        return JsonResponse({"ok": True, "url": url, "key": key})
+    except ClientError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+def s3_list(request):
+    try:
+        s3 = boto3.client("s3", region_name=settings.AWS_DEFAULT_REGION)
+        prefix = "media/produtos/"
+        resp = s3.list_objects_v2(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Prefix=prefix)
+        keys = []
+        for it in resp.get("Contents", []):
+            keys.append(it["Key"])
+        return JsonResponse({"ok": True, "count": len(keys), "keys": keys})
+    except ClientError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
+# --------------------------------------------------------------
 
 urlpatterns = [
-    # … suas rotas já existentes …
-    path('admin/', admin.site.urls),
-    path("s3-put/", s3_put, name="s3_put"),
-    path("s3-list/", s3_list, name="s3_list"),
+    path('admin/', admin.site.urls),  # <-- precisa do import acima
+    path('whoami-s3/', whoami_s3),
+    path('probe-s3/', probe_s3),
+    path('s3-put/', s3_put),
+    path('s3-list/', s3_list),
+
+    # suas rotas de app (ex.: loja) se existirem:
+    # path('', include('loja.urls')),
 ]
+
+# servir media em dev (não afeta Render/Docker)
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

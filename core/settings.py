@@ -122,3 +122,6 @@ LOGIN_REDIRECT_URL = "/admin/"
 LOGOUT_REDIRECT_URL = "/admin/login/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+import os
+ADMIN_MAINT_TOKEN = os.environ.get("ADMIN_MAINT_TOKEN", "").strip()

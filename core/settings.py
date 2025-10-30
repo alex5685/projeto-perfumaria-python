@@ -1,33 +1,16 @@
-"""
-Django settings for core project.
-Produção no Render + Postgres + S3 (mídia) + WhiteNoise (estáticos).
-"""
 import os
 from pathlib import Path
-import dj_database_url
 
-# ---------------------------------------
-# Paths
-# ---------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ---------------------------------------
-# Segurança / Debug
-# ---------------------------------------
-SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-production")
-DEBUG = os.environ.get("DEBUG", "0") in ("1", "true", "True")
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
-_env_hosts = os.environ.get("ALLOWED_HOSTS", "")
-ALLOWED_HOSTS = [h.strip() for h in _env_hosts.split(",") if h.strip()] or [
-    "localhost", "127.0.0.1", ".onrender.com"
+ALLOWED_HOSTS = [
+    *[h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()],
+    "localhost", "127.0.0.1",
 ]
 
-CSRF_TRUSTED_ORIGINS = ["https://*.onrender.com"]
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
-# ---------------------------------------
-# Apps
-# ---------------------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -35,13 +18,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # sua app:
     "loja",
-    "storages",  # S3
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # WhiteNoise logo após SecurityMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -70,64 +52,71 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "core.wsgi.application"
 
-# ---------------------------------------
-# Banco (Render Postgres)
-# ---------------------------------------
-DEFAULT_DB_URL = f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
-DATABASES = {
-    "default": dj_database_url.parse(
-        os.environ.get("DATABASE_URL", DEFAULT_DB_URL),
-        conn_max_age=600,
-        ssl_require=True if os.environ.get("DATABASE_URL", "").startswith("postgres") else False,
-    )
-}
+# Banco de dados (Render → variáveis de ambiente já apontam)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL:
+    # dj-database-url não é estritamente necessário aqui; use seu config atual se preferir
+    import dj_database_url
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
-# ---------------------------------------
-# Locale
-# ---------------------------------------
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True
 USE_TZ = True
 
-# ---------------------------------------
-# Estáticos (WhiteNoise)
-# ---------------------------------------
+# STATIC & MEDIA
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# ---------------------------------------
-# Mídia (S3)
-# ---------------------------------------
-USE_S3 = os.environ.get("USE_S3", "1") in ("1", "true", "True")
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
-if USE_S3:
-    AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME") or os.environ.get("AWS_DEFAULT_REGION", "us-east-2")
-    AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME", "perfumaria-fotos-alex")
-    AWS_LOCATION = os.environ.get("AWS_LOCATION", "media")
+# ---------- S3 / boto3 ----------
+# Estes três devem existir no Render
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "")
 
-    AWS_DEFAULT_ACL = None          # não grava ACL por objeto
-    AWS_QUERYSTRING_AUTH = False    # URLs públicas sem assinatura
-    AWS_S3_SIGNATURE_VERSION = "s3v4"
+# A REGIÃO era o que faltava no settings
+AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-2")  # Ohio (igual ao console)
+# Muitos pacotes esperam este alias:
+AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", AWS_DEFAULT_REGION)
 
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+# Opcionalmente, para URLs públicas legíveis e sem assinatura
+AWS_QUERYSTRING_AUTH = False
+AWS_S3_ADDRESSING_STYLE = "virtual"
 
-    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
-    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/"
-else:
-    MEDIA_URL = "/media/"
-    MEDIA_ROOT = BASE_DIR / "media"
-
-# ---------------------------------------
-# Logs
-# ---------------------------------------
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
-    "root": {"handlers": ["console"], "level": "INFO" if not DEBUG else "DEBUG"},
-}
+# Se você usa django-storages (FileSystem local para estático e S3 p/ media)
+USE_S3_FOR_MEDIA = True
+if USE_S3_FOR_MEDIA and AWS_STORAGE_BUCKET_NAME:
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+    # Pasta de mídia dentro do bucket
+    AWS_LOCATION = "media"
+    AWS_DEFAULT_ACL = None
+    # (o path “media/” é tratado na aplicação; as views que criamos já usam media/produtos/)
+# ---------- /S3 ----------
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -33,6 +33,7 @@ def s3_put(request):
 
 urlpatterns = [
     # … suas rotas já existentes …
+    path('admin/', admin.site.urls),
     path("s3-put/", s3_put, name="s3_put"),
     path("s3-list/", s3_list, name="s3_list"),
 ]

@@ -4,18 +4,22 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.conf.urls.static import static
 
-# ---- Endpoints de diagnóstico S3 (opcionais em produção) ----
+# === Endpoints de diagnóstico S3 (úteis para testar credenciais/region/prefixos) ===
 import boto3
 from botocore.exceptions import ClientError
 
+
 def whoami_s3(request):
+    """Retorna a identidade AWS (STS) usada pela aplicação."""
     try:
         sts = boto3.client("sts", region_name=settings.AWS_DEFAULT_REGION)
         return JsonResponse(sts.get_caller_identity())
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
+
 def probe_s3(request):
+    """Grava um arquivo de teste em media/produtos/_probe.txt (ACL public-read)."""
     try:
         s3 = boto3.client("s3", region_name=settings.AWS_DEFAULT_REGION)
         key = "media/produtos/_probe.txt"
@@ -31,7 +35,9 @@ def probe_s3(request):
     except ClientError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
+
 def s3_put(request):
+    """Grava um arquivo de diagnóstico em media/produtos/_diag.txt (ACL public-read)."""
     try:
         s3 = boto3.client("s3", region_name=settings.AWS_DEFAULT_REGION)
         key = "media/produtos/_diag.txt"
@@ -47,30 +53,33 @@ def s3_put(request):
     except ClientError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
+
 def s3_list(request):
+    """Lista objetos sob o prefixo media/produtos/."""
     try:
         s3 = boto3.client("s3", region_name=settings.AWS_DEFAULT_REGION)
         prefix = "media/produtos/"
         resp = s3.list_objects_v2(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Prefix=prefix)
-        keys = []
-        for it in resp.get("Contents", []):
-            keys.append(it["Key"])
+        keys = [it["Key"] for it in resp.get("Contents", [])]
         return JsonResponse({"ok": True, "count": len(keys), "keys": keys})
     except ClientError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
-# --------------------------------------------------------------
 
+
+# === Rotas ===
 urlpatterns = [
-    path('admin/', admin.site.urls),  # <-- precisa do import acima
-    path('whoami-s3/', whoami_s3),
-    path('probe-s3/', probe_s3),
-    path('s3-put/', s3_put),
-    path('s3-list/', s3_list),
-    path("s3-diag/", views.s3_diag, name="s3-diag"),
-    # suas rotas de app (ex.: loja) se existirem:
-    # path('', include('loja.urls')),
+    path("admin/", admin.site.urls),
+
+    # Diagnóstico S3
+    path("whoami-s3/", whoami_s3),
+    path("probe-s3/", probe_s3),
+    path("s3-put/", s3_put),
+    path("s3-list/", s3_list),
+
+    # Suas rotas do app (se existir um app "loja", por exemplo):
+    # path("", include("loja.urls")),
 ]
 
-# servir media em dev (não afeta Render/Docker)
+# Servir arquivos de media em DEV (não afeta Render/Docker)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

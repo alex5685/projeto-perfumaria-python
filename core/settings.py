@@ -1,29 +1,18 @@
 import os
 from pathlib import Path
 
-# --- Paths base ---
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# --- Segurança / Ambiente ---
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "change-me")
-DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+# ──────────────────────────────────────────────────────────────────────────────
+# Básico
+# ──────────────────────────────────────────────────────────────────────────────
+SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-prod")
+DEBUG = os.getenv("DEBUG", "False").lower() in ("1", "true", "yes")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip(),  # Render injeta este host
-    os.getenv("ALLOWED_HOST_EXTRA", "").strip(),        # opcional
-]
-ALLOWED_HOSTS = [h for h in ALLOWED_HOSTS if h]  # remove vazios
-
-# No Render o domínio é sempre https://<serviço>.onrender.com
-RENDER_HOST = os.getenv("RENDER_EXTERNAL_HOSTNAME", "")
-if RENDER_HOST:
-    CSRF_TRUSTED_ORIGINS = [f"https://{RENDER_HOST}"]
-else:
-    CSRF_TRUSTED_ORIGINS = []
-
-# --- Apps ---
+# ──────────────────────────────────────────────────────────────────────────────
+# Apps
+# ──────────────────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -31,14 +20,21 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # sua app de domínio (ex.: "loja") pode ficar aqui
+
+    # Apps do projeto
     "core",
+    "loja",  # <<< IMPORTANTE: garante que a seção LOJA apareça no admin
+    # Se você usa AppConfig, pode usar "loja.apps.LojaConfig"
 ]
 
-# --- Middleware ---
+# ──────────────────────────────────────────────────────────────────────────────
+# Middleware
+# ──────────────────────────────────────────────────────────────────────────────
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # estáticos pelo Whitenoise
+    # WhiteNoise para servir estáticos no Render
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -49,6 +45,9 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "core.urls"
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Templates
+# ──────────────────────────────────────────────────────────────────────────────
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -67,19 +66,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "core.wsgi.application"
 
-# --- Banco (use o que já estiver em produção; aqui fica o default em SQLite) ---
+# ──────────────────────────────────────────────────────────────────────────────
+# Banco (SQLite por padrão; ajuste se usar outro)
+# ──────────────────────────────────────────────────────────────────────────────
 DATABASES = {
     "default": {
         "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.sqlite3"),
         "NAME": os.getenv("DB_NAME", BASE_DIR / "db.sqlite3"),
-        "USER": os.getenv("DB_USER", ""),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", ""),
-        "PORT": os.getenv("DB_PORT", ""),
     }
 }
 
-# --- Passwords / Auth ---
+# ──────────────────────────────────────────────────────────────────────────────
+# Senhas / i18n
+# ──────────────────────────────────────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -92,35 +91,57 @@ TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True
 USE_TZ = True
 
-# --- Arquivos estáticos ---
+# ──────────────────────────────────────────────────────────────────────────────
+# Arquivos estáticos
+# ──────────────────────────────────────────────────────────────────────────────
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
-# compressão e cache no Whitenoise
+# WhiteNoise: compactação e manifest
 STORAGES = {
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
 }
 
-# --- Arquivos de mídia (em S3) ---
-# Prefixo padrão das imagens de produtos
-AWS_MEDIA_PREFIX = os.getenv("AWS_MEDIA_PREFIX", "media/produtos/").strip().rstrip("/") + "/"
+# ──────────────────────────────────────────────────────────────────────────────
+# Arquivos de mídia (local por padrão; S3 opcional abaixo)
+# ──────────────────────────────────────────────────────────────────────────────
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-2")  # Ohio
-AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "")
-
-# --- Cookies / SSL no Render ---
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# ──────────────────────────────────────────────────────────────────────────────
+# Segurança básica para produção/Render
+# ──────────────────────────────────────────────────────────────────────────────
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "True").lower() in ("1", "true", "yes")
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.onrender.com",
+    *[f"https://{h.strip()}" for h in ALLOWED_HOSTS if h.strip() and h.strip() != "*"],
+]
+
+# Cookies compatíveis com login do admin atrás de proxy/CDN
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 
-# --- Token de manutenção (bootstrap do admin) ---
-# Defina no Render: ADMIN_MAINT_TOKEN = "adm-Reset-9f2c" (por exemplo)
-ADMIN_MAINT_TOKEN = os.getenv("ADMIN_MAINT_TOKEN", "").strip()
+# ──────────────────────────────────────────────────────────────────────────────
+# S3 (opcional): só ativa se as variáveis existirem no ambiente
+# ──────────────────────────────────────────────────────────────────────────────
+AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = os.getenv("AWS_DEFAULT_REGION") or os.getenv("AWS_REGION")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 
+if AWS_STORAGE_BUCKET_NAME and AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
+    # Caso use django-storages:
+    # pip install boto3 django-storages
+    INSTALLED_APPS.append("storages")
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    AWS_S3_ADDRESSING_STYLE = "virtual"   # padrão
+    AWS_QUERYSTRING_AUTH = False          # URLs públicas sem query de assinatura
+    AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Padrões Django 5
+# ──────────────────────────────────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

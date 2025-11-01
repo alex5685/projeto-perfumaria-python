@@ -1,21 +1,31 @@
+# loja/admin.py
 from django.contrib import admin
-from .models import Produto, Pedido, LogWhatsapp  # <-- nome exato da classe no models.py
+from .models import Produto, Pedido, LogWhatsapp
 
-# Ajuste as colunas conforme os campos reais do seu models.py.
+
 @admin.register(Produto)
 class ProdutoAdmin(admin.ModelAdmin):
-    list_display = ("id", "nome", "preco")  # troque pelos campos que existem aí
+    list_display = ("id", "nome", "preco", "estoque")
     search_fields = ("nome",)
-    list_filter = ()
+    list_filter = ("estoque",)
+    ordering = ("-id",)
+
 
 @admin.register(Pedido)
 class PedidoAdmin(admin.ModelAdmin):
-    list_display = ("id", "cliente", "status", "criado_em")  # ajuste conforme o seu model
-    search_fields = ("cliente",)
-    list_filter = ("status",)
+    # Campos que EXISTEM em loja.Pedido (confere no models.py)
+    list_display = ("id", "cliente", "status", "criado_em")
+    list_filter = ("status", "criado_em")   # >>> criado_em (não created_at)
+    search_fields = ("cliente", "telefone", "endereco")
+    readonly_fields = ("criado_em",)
+    date_hierarchy = "criado_em"
+    ordering = ("-criado_em",)
+
 
 @admin.register(LogWhatsapp)
 class LogWhatsappAdmin(admin.ModelAdmin):
-    list_display = ("id", "numero", "mensagem", "created_at")  # ajuste conforme o seu model
-    search_fields = ("numero", "mensagem")
-    list_filter = ("created_at",)
+    list_display = ("id", "produto", "data_envio", "sucesso")
+    list_filter = ("sucesso", "data_envio")  # >>> data_envio (não created_at)
+    search_fields = ("produto__nome",)
+    date_hierarchy = "data_envio"
+    ordering = ("-data_envio",)

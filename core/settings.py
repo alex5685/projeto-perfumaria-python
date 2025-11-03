@@ -1,55 +1,57 @@
 # core/settings.py
 from pathlib import Path
 import os
-from urllib.parse import urlparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# --------------------------------------------------------------------------------------
-# Básico
-# --------------------------------------------------------------------------------------
-SECRET_KEY = os.environ.get("SECRET_KEY", "change-me-in-prod")
-DEBUG = os.environ.get("DEBUG", "0") == "1"
+# ------------------------- Segurança / Execução -------------------------
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-NÃO-USE-EM-PRODUÇÃO")
+DEBUG = os.environ.get("DEBUG", "False").lower() in ("1", "true", "yes")
 
 ALLOWED_HOSTS = [
-    "localhost", "127.0.0.1",
+    "localhost",
+    "127.0.0.1",
     ".onrender.com",
+    os.environ.get("RENDER_EXTERNAL_HOSTNAME", ""),
 ]
 
-# Para construir os trusted origins automaticamente quando em onrender.com
-_render_host = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
-CSRF_TRUSTED_ORIGINS = [
-    "https://localhost",
-    "https://*.onrender.com",
-]
-if _render_host:
-    CSRF_TRUSTED_ORIGINS.append(f"https://{_render_host}")
+# HTTPS por trás do proxy do Render (evita loop no admin)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 
-# --------------------------------------------------------------------------------------
-# Apps
-# --------------------------------------------------------------------------------------
+# CSRF confiável para *.onrender.com
+CSRF_TRUSTED_ORIGINS = ["https://*.onrender.com"]
+
+# NÃO force redirect HTTPS aqui (SECURE_SSL_REDIRECT). O Render já termina TLS.
+# SECURE_SSL_REDIRECT = True  # <- deixe DESLIGADO para não criar loops
+
+
+# ------------------------------- Apps -----------------------------------
 INSTALLED_APPS = [
-    # Django core
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
-    "django.contrib.staticfiles",     # << necessário para o collectstatic
 
-    # Terceiros
-    "storages",                       # django-storages (S3)
+    # WhiteNoise (antes de staticfiles para runserver_nostatic)
+    "whitenoise.runserver_nostatic",
+    "django.contrib.staticfiles",
 
-    # Apps do projeto
+    # S3
+    "storages",
+
+    # sua app
     "loja",
 ]
 
-# --------------------------------------------------------------------------------------
-# Middleware
-# --------------------------------------------------------------------------------------
+# ----------------------------- Middleware --------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # << servir estáticos no Render
+
+    # WhiteNoise logo após SecurityMiddleware
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -59,7 +61,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "core.urls"
+WSGI_APPLICATION = "core.wsgi.application"
 
+# ------------------------------ Templates --------------------------------
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -76,19 +80,13 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "core.wsgi.application"
-
-# --------------------------------------------------------------------------------------
-# Banco de dados: DATABASE_URL (Postgres no Render) com fallback SQLite
-# --------------------------------------------------------------------------------------
-# Exemplos de DATABASE_URL:
-#  - Postgres:  postgres://user:pass@host:5432/dbname
-#  - Render    (variável DATABASE_URL já pronta)
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if DATABASE_URL:
+# ------------------------------- Banco -----------------------------------
+if os.environ.get("DATABASE_URL"):
     import dj_database_url
     DATABASES = {
-        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=True)
+        "default": dj_database_url.parse(
+            os.environ["DATABASE_URL"], conn_max_age=600
+        )
     }
 else:
     DATABASES = {
@@ -98,74 +96,49 @@ else:
         }
     }
 
-# --------------------------------------------------------------------------------------
-# Idioma/Timezone
-# --------------------------------------------------------------------------------------
+# ----------------------------- Localização -------------------------------
 LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True
 USE_TZ = True
 
-# --------------------------------------------------------------------------------------
-# Arquivos estáticos (WhiteNoise) e mídia (S3)
-# --------------------------------------------------------------------------------------
-# ESTÁTICOS → WhiteNoise (build do Render roda "collectstatic")
+# ------------------------------- Static ----------------------------------
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# (opcional, caso tenha pasta "static" no projeto)
-# STATICFILES_DIRS = [BASE_DIR / "static"]
+# WhiteNoise só para estáticos (mídia fica no S3)
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+    # Storage padrão (uploads de usuário) -> S3
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+}
 
-# MÍDIA → S3 (django-storages/boto3)
-# OBS: deixe estáticos no WhiteNoise e use S3 apenas para uploads (ImageField/FileField)
-AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
-AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME")
-AWS_DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-2")  # ajuste se necessário
+# ----------------------------- Mídia no S3 -------------------------------
+AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME", "perfumaria-fotos-alex")
+AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME", "us-east-2")
+AWS_S3_SIGNATURE_VERSION = "s3v4"
 
-# Só ativa S3 se as credenciais existirem
-USE_S3_MEDIA = all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_STORAGE_BUCKET_NAME])
+# URLs públicas (se o bucket tiver policy de leitura)
+AWS_QUERYSTRING_AUTH = False
+AWS_S3_FILE_OVERWRITE = False
+AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
 
-if USE_S3_MEDIA:
-    # Endpoint automático pela região; se usar outro (ex.: CloudFront), defina AWS_S3_CUSTOM_DOMAIN
-    AWS_S3_REGION_NAME = AWS_DEFAULT_REGION
-    AWS_S3_SIGNATURE_VERSION = "s3v4"
-    AWS_QUERYSTRING_AUTH = False  # URLs públicas de mídia (ajuste conforme sua política)
-    AWS_S3_FILE_OVERWRITE = False
-    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-else:
-    # Fallback local (desenvolvimento)
-    MEDIA_URL = "/media/"
-    MEDIA_ROOT = BASE_DIR / "media"
+# Tudo que é upload irá para a pasta "media/" do bucket
+AWS_LOCATION = "media"
+AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
 
-# --------------------------------------------------------------------------------------
-# Segurança / Proxy (Render)
-# --------------------------------------------------------------------------------------
-# Respeitar o X-Forwarded-Proto do proxy para detectar HTTPS corretamente
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-USE_X_FORWARDED_HOST = True
+# URLs geradas pelos campos de arquivo/imagem
+MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_LOCATION}/"
+# (Não defina MEDIA_ROOT usando S3)
 
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-CSRF_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_SAMESITE = "Lax"
-
-# Se quiser forçar HTTPS em produção:
-if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-
-# --------------------------------------------------------------------------------------
-# Senhas / Validators
-# --------------------------------------------------------------------------------------
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-]
-
-# --------------------------------------------------------------------------------------
-# Admin
-# --------------------------------------------------------------------------------------
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+# ------------------------------- Logging ---------------------------------
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "INFO"},
+}

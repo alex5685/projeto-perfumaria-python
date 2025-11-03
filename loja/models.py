@@ -1,63 +1,34 @@
+# loja/models.py
 from django.db import models
-from django.contrib.auth.models import User
-
-# --- MÓDULO SECUNDÁRIO (ADM/Controle) ---
 
 class Produto(models.Model):
-    """Modelo para Perfumes, Maquiagem e Cuidados Pessoais."""
-    nome = models.CharField(max_length=200, verbose_name="Nome do Produto")
-    descricao = models.TextField(verbose_name="Descrição Detalhada")
-    preco = models.DecimalField(max_digits=8, decimal_places=2, verbose_name="Preço de Venda")
-    
-    # Controle de Estoque (Usado pelo ADM)
-    estoque = models.IntegerField(default=0, verbose_name="Quantidade em Estoque")
-    
-    # Imagem (Gatilho para WhatsApp)
-    imagem = models.ImageField(upload_to='produtos/', blank=True, null=True)
-    
-    # Status de Publicação (Define se o produto está no site)
-    publicado = models.BooleanField(default=False, verbose_name="Disponível no Site")
-    data_criacao = models.DateTimeField(auto_now_add=True)
+    nome = models.CharField("Nome do Produto", max_length=120)
+    descricao = models.TextField("Descrição Detalhada", blank=True)
+    preco_venda = models.DecimalField("Preço de Venda", max_digits=10, decimal_places=2)
+    quantidade_estoque = models.PositiveIntegerField("Quantidade em Estoque", default=0)
+    disponivel_no_site = models.BooleanField("Disponível no Site", default=True)
 
-    class Meta:
-        verbose_name = "Produto"
-        verbose_name_plural = "Produtos"
+    # >>> AQUI é o ponto crítico: use "produtos/" (plural)
+    imagem = models.ImageField(upload_to="produtos/", blank=True, null=True)
+
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.nome
-        
-# --- MÓDULO PRINCIPAL (Vendas/Pedidos) ---
+
 
 class Pedido(models.Model):
-    STATUS_CHOICES = [
-        ('PENDENTE', 'Pagamento Pendente'),
-        ('PAGO', 'Pagamento Confirmado'),
-        ('ENVIADO', 'Enviado'),
-        ('ENTREGUE', 'Entregue'),
-    ]
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
 
-    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    data_pedido = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDENTE')
-    total = models.DecimalField(max_digits=8, decimal_places=2)
-    
-    # Dados para Integração PIX/Pagamento
-    pix_cobranca_id = models.CharField(max_length=255, blank=True, null=True, 
-                                       verbose_name="ID da Cobrança PIX")
-
-    class Meta:
-        verbose_name = "Pedido"
-        verbose_name_plural = "Pedidos"
-        
     def __str__(self):
-        return f"Pedido #{self.id} - {self.status}"
+        return f"Pedido #{self.pk}"
 
-# Modelo para o WhatsApp (Log de Notificações)
+
 class LogWhatsapp(models.Model):
-    produto = models.ForeignKey(Produto, on_delete=models.CASCADE)
-    data_envio = models.DateTimeField(auto_now_add=True)
-    sucesso = models.BooleanField(default=False)
-    
-    def __str__(self):
-        return f"Log WhatsApp Produto {self.produto.nome}"
+    criado_em = models.DateTimeField(auto_now_add=True)
+    conteudo = models.TextField()
 
+    def __str__(self):
+        return f"Log {self.pk}"

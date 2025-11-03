@@ -1,0 +1,78 @@
+# ============================================
+# Arquivo: .dockerignore
+# Otimizado para projeto Django + Render + S3
+# ============================================
+
+# Diretórios de cache e compilação Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+*.egg
+.eggs/
+
+# Ambientes virtuais
+.env
+.venv/
+venv/
+env/
+ENV/
+
+# Arquivos temporários e logs
+*.log
+*.pot
+*.pyproj
+*.suo
+*.bak
+*.tmp
+*.swp
+
+# Banco de dados local
+db.sqlite3
+*.db
+
+# Diretórios de build e cache
+build/
+dist/
+.cache/
+.idea/
+.vscode/
+.mypy_cache/
+pytest_cache/
+.coverage
+
+# Diretórios Django gerados localmente
+media/
+static/
+staticfiles/
+collected_static/
+
+# Configurações locais sensíveis
+.env.local
+.env.dev
+.env.test
+.env.production
+.env.backup
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs e dumps
+*.log
+*.out
+*.err
+*.gz
+*.zip
+*.tar
+*.tar.gz
+*.bak
+*.orig
+
+# Outros artefatos que não devem ir pro container
+*.sqlite3
+__MACOSX/
+*.old

@@ -1,13 +1,13 @@
-Django=4.2,<5
+Django
 Pillow
 gunicorn
-whitenoise=6
+whitenoise
 requests
 psycopg2-binary # Driver para PostgreSQL
-dj-database-url>=2 # Facilita a leitura da variavel DATABASE_URL
+dj-database-url # Facilita a leitura da variavel DATABASE_URL
 # Adicionar S3
-django-storages=1.14
-boto3=1.28
+django-storages
+boto3
 # Adicione outros pacotes do seu projeto que você usa (ex:
 # django-debug-toolbar
 # python-decouple

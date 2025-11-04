@@ -1,75 +1,55 @@
 from django.contrib import admin
-from django.utils.safestring import mark_safe
+from .models import Produto, Pedido, LogWhatsapps
 
-from .models import Produto, Pedido
-# ⚠️ Por enquanto NÃO registramos LogWhatsapps para não quebrar o admin
-# from .models import LogWhatsapps
-
+# Utilitário: garante que só usamos campos que realmente existem
+def only_existing(model, names):
+    valid = {f.name for f in model._meta.get_fields() if hasattr(f, "name")}
+    return [n for n in names if n in valid]
 
 @admin.register(Produto)
 class ProdutoAdmin(admin.ModelAdmin):
-    """
-    Alinhado ao models atual:
-      - nome
-      - descricao_detalhada
-      - preco_venda (DecimalField)
-      - quantidade_estoque (IntegerField)
-      - disponivel_no_site (BooleanField)
-      - imagem (ImageField upload_to="produtos/")
-      - criado_em / atualizado_em (DateTimeField auto_*)
-    """
-    list_display = (
-        "id",
-        "nome",
-        "preco_venda",
-        "quantidade_estoque",
-        "disponivel_no_site",
-        "criado_em",
-        "atualizado_em",
-    )
-    list_filter = ("disponivel_no_site", "criado_em")
-    search_fields = ("nome", "descricao_detalhada")
-    date_hierarchy = "criado_em"
-    ordering = ("-criado_em",)
-
-    readonly_fields = ("criado_em", "atualizado_em", "imagem_preview")
-
-    # Define explicitamente os campos que aparecem no form de edição
-    fields = (
-        "nome",
-        "descricao_detalhada",
-        "preco_venda",
-        "quantidade_estoque",
-        "disponivel_no_site",
-        "imagem",
-        "imagem_preview",
-        "criado_em",
-        "atualizado_em",
-    )
-
-    def imagem_preview(self, obj):
-        if getattr(obj, "imagem", None):
-            try:
-                url = obj.imagem.url
-            except Exception:
-                return "—"
-            return mark_safe(f'<img src="{url}" style="max-height:120px;max-width:100%%" />')
-        return "—"
-
-    imagem_preview.short_description = "Pré-visualização"
+    # Campos esperados no modelo atual:
+    # nome, descricao_detalhada, imagem, quantidade_estoque,
+    # preco_venda, disponivel_no_site, criado_em, atualizado_em
+    list_display  = only_existing(Produto, [
+        "nome", "preco_venda", "quantidade_estoque",
+        "disponivel_no_site", "criado_em", "atualizado_em",
+    ])
+    list_filter   = only_existing(Produto, [
+        "disponivel_no_site", "criado_em", "atualizado_em",
+    ])
+    search_fields = only_existing(Produto, ["nome"])
+    date_hierarchy = "criado_em" if "criado_em" in {f.name for f in Produto._meta.get_fields()} else None
+    ordering      = ["-criado_em"] if "criado_em" in {f.name for f in Produto._meta.get_fields()} else None
+    readonly_fields = only_existing(Produto, ["criado_em", "atualizado_em"])
 
 
 @admin.register(Pedido)
 class PedidoAdmin(admin.ModelAdmin):
-    """
-    Alinhe aqui aos campos reais do seu Pedido.
-    Este exemplo usa apenas campos estáveis para não quebrar o admin.
-    """
-    list_display = ("id", "criado_em")
-    date_hierarchy = "criado_em"
-    ordering = ("-criado_em",)
-    readonly_fields = ("criado_em",)
+    # Campos esperados no modelo atual do Pedido:
+    # cliente (se existir), criado_em, atualizado_em, etc.
+    # Use apenas os existentes aí no seu models.py
+    base = {f.name for f in Pedido._meta.get_fields()}
+    # linhas, filtros, busca e ordenação só com campos válidos
+    list_display  = only_existing(Pedido, [
+        "id", "cliente", "criado_em", "atualizado_em",
+    ]) or ["id"]
+    list_filter   = only_existing(Pedido, ["criado_em", "atualizado_em"])
+    search_fields = only_existing(Pedido, ["cliente"])
+    date_hierarchy = "criado_em" if "criado_em" in base else None
+    ordering       = ["-criado_em"] if "criado_em" in base else ["-id"]
+    readonly_fields = only_existing(Pedido, ["criado_em", "atualizado_em"])
 
-    # Se você tiver outros campos (cliente, status etc.), adicione-os aqui,
-    # sempre com os nomes EXATOS do models.py.
-    fields = ("criado_em",)
+
+@admin.register(LogWhatsapps)
+class LogWhatsappsAdmin(admin.ModelAdmin):
+    # Ajuste estes nomes de acordo com o seu LogWhatsapps atual
+    # (ex.: telefone, mensagem, criado_em, status…)
+    list_display  = only_existing(LogWhatsapps, [
+        "id", "telefone", "mensagem", "criado_em",
+    ]) or ["id"]
+    list_filter   = only_existing(LogWhatsapps, ["criado_em"])
+    search_fields = only_existing(LogWhatsapps, ["telefone", "mensagem"])
+    date_hierarchy = "criado_em" if "criado_em" in {f.name for f in LogWhatsapps._meta.get_fields()} else None
+    ordering       = ["-criado_em"] if "criado_em" in {f.name for f in LogWhatsapps._meta.get_fields()} else ["-id"]
+    readonly_fields = only_existing(LogWhatsapps, ["criado_em"])

@@ -1,51 +1,52 @@
+# loja/admin.py
 from django.contrib import admin
-from .models import Produto, Pedido, LogWhatsapps
 
-# ---------------------------
-# Produto
-# ---------------------------
+from .models import Produto, Pedido
+
+# Tenta importar o modelo de log com os dois nomes possíveis.
+LogWhatsappModel = None
+try:
+    # plural
+    from .models import LogWhatsapps as LogWhatsappModel  # type: ignore
+except Exception:
+    try:
+        # singular
+        from .models import LogWhatsapp as LogWhatsappModel  # type: ignore
+    except Exception:
+        LogWhatsappModel = None
+
+
 @admin.register(Produto)
 class ProdutoAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "nome",
-        "preco_venda",
-        "quantidade_estoque",
-        "disponivel_no_site",
-        "criado_em",
-        "atualizado_em",
-    )
+    # Somente campos que existem e já foram validados
+    list_display = ("id", "nome", "preco_venda", "disponivel_no_site")
+    # Nada de callables ou campos inexistentes
     search_fields = ("nome",)
     list_filter = ("disponivel_no_site",)
-    readonly_fields = ("criado_em", "atualizado_em")
-    date_hierarchy = "criado_em"
-    ordering = ("-criado_em",)
+    ordering = ("id",)
+    readonly_fields = ()
+    date_hierarchy = None
 
 
-# ---------------------------
-# Pedido
-# Campos válidos hoje: id, nome, criado_em, atualizado_em
-# (removemos cliente/status/total/etc. nas migrações anteriores)
-# ---------------------------
 @admin.register(Pedido)
 class PedidoAdmin(admin.ModelAdmin):
-    list_display = ("id", "nome", "criado_em", "atualizado_em")
-    search_fields = ("nome",)
-    list_filter = ("criado_em",)
-    readonly_fields = ("criado_em", "atualizado_em")
-    date_hierarchy = "criado_em"
-    ordering = ("-criado_em",)
+    # Modo seguro: só 'id' até estabilizarmos os campos
+    list_display = ("id",)
+    search_fields = ()
+    list_filter = ()
+    ordering = ("id",)
+    readonly_fields = ()
+    date_hierarchy = None
 
 
-# ---------------------------
-# LogWhatsapps
-# Garanta que o modelo se chama LogWhatsapps (no plural) e tem
-# pelo menos: id, mensagem, criado_em
-# ---------------------------
-@admin.register(LogWhatsapps)
-class LogWhatsappsAdmin(admin.ModelAdmin):
-    list_display = ("id", "mensagem", "criado_em")
-    search_fields = ("mensagem",)
-    readonly_fields = ("criado_em",)
-    date_hierarchy = "criado_em"
-    ordering = ("-criado_em",)
+if LogWhatsappModel:
+    # Registro condicional conforme o nome real do modelo
+    class _LogWhatsappsAdmin(admin.ModelAdmin):
+        list_display = ("id",)
+        search_fields = ()
+        list_filter = ()
+        ordering = ("id",)
+        readonly_fields = ()
+        date_hierarchy = None
+
+    admin.site.register(LogWhatsappModel, _LogWhatsappsAdmin)

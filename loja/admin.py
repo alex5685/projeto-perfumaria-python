@@ -1,21 +1,14 @@
+# loja/admin.py
 from django.contrib import admin
+from django.utils.html import format_html
+
 from .models import Produto, Pedido, LogWhatsapps
-
-
-def _has_field(model, name: str) -> bool:
-    return name in {f.name for f in model._meta.fields}
-
-
-def _pick(model, *names):
-    existing = {f.name for f in model._meta.fields}
-    return tuple(n for n in names if n in existing)
 
 
 @admin.register(Produto)
 class ProdutoAdmin(admin.ModelAdmin):
-    # Exibe apenas campos que existem no modelo
-    list_display = _pick(
-        Produto,
+    # Campos que existem de fato no modelo Produto
+    list_display = (
         "id",
         "nome",
         "preco_venda",
@@ -23,56 +16,68 @@ class ProdutoAdmin(admin.ModelAdmin):
         "disponivel_no_site",
         "criado_em",
         "atualizado_em",
+        "preview_imagem",
     )
-    search_fields = _pick(Produto, "nome", "descricao_detalhada")
-    list_filter = _pick(Produto, "disponivel_no_site", "criado_em", "atualizado_em")
-    readonly_fields = _pick(Produto, "criado_em", "atualizado_em")
+    list_display_links = ("id", "nome")
+    search_fields = ("nome",)
+    list_filter = ("disponivel_no_site",)
+    date_hierarchy = "criado_em"
+    ordering = ("-criado_em",)
 
-    # Define date_hierarchy somente se o campo existir
-    if _has_field(Produto, "criado_em"):
-        date_hierarchy = "criado_em"
+    readonly_fields = ("criado_em", "atualizado_em", "preview_imagem")
 
-    ordering = ("-id",) if _has_field(Produto, "id") else None
+    fieldsets = (
+        ("Informações do Produto", {
+            "fields": ("nome", "descricao_detalhada", "imagem", "preview_imagem")
+        }),
+        ("Comercial/Estoque", {
+            "fields": ("preco_venda", "quantidade_estoque", "disponivel_no_site")
+        }),
+        ("Auditoria", {
+            "fields": ("criado_em", "atualizado_em")
+        }),
+    )
+
+    def preview_imagem(self, obj):
+        """Pequena prévia da imagem (se existir)."""
+        if obj.imagem:
+            return format_html(
+                '<img src="{}" style="height:60px;border-radius:6px;" />',
+                obj.imagem.url,
+            )
+        return "—"
+    preview_imagem.short_description = "Prévia"
 
 
 @admin.register(Pedido)
 class PedidoAdmin(admin.ModelAdmin):
-    # Coloque aqui o superset de campos “possíveis” do seu Pedido;
-    # o helper _pick garante que só os existentes serão usados.
-    list_display = _pick(
-        Pedido,
-        "id",
-        "cliente",           # será ignorado se não existir
-        "status",
-        "total",
-        "criado_em",
-        "atualizado_em",
+    # CUIDADO: o modelo atual de Pedido só tem 'criado_em'
+    list_display = ("id", "criado_em")
+    list_display_links = ("id",)
+    date_hierarchy = "criado_em"
+    ordering = ("-criado_em",)
+    readonly_fields = ("criado_em",)
+
+    fieldsets = (
+        ("Pedido", {"fields": ("criado_em",)}),
     )
-    search_fields = _pick(Pedido, "cliente", "email", "telefone")
-    list_filter = _pick(Pedido, "status", "criado_em", "atualizado_em")
-    readonly_fields = _pick(Pedido, "criado_em", "atualizado_em")
-
-    if _has_field(Pedido, "criado_em"):
-        date_hierarchy = "criado_em"
-
-    ordering = ("-id",) if _has_field(Pedido, "id") else None
 
 
 @admin.register(LogWhatsapps)
 class LogWhatsappsAdmin(admin.ModelAdmin):
-    list_display = _pick(
-        LogWhatsapps,
-        "id",
-        "pedido",        # se tiver FK para Pedido
-        "mensagem",
-        "criado_em",
-        "atualizado_em",
+    # Campos existentes: 'mensagem' e 'criado_em'
+    list_display = ("id", "mensagem_resumida", "criado_em")
+    list_display_links = ("id",)
+    search_fields = ("mensagem",)
+    date_hierarchy = "criado_em"
+    ordering = ("-criado_em",)
+    readonly_fields = ("criado_em",)
+
+    fieldsets = (
+        ("Log de WhatsApp", {"fields": ("mensagem", "criado_em")}),
     )
-    search_fields = _pick(LogWhatsapps, "mensagem")
-    list_filter = _pick(LogWhatsapps, "criado_em", "atualizado_em")
-    readonly_fields = _pick(LogWhatsapps, "criado_em", "atualizado_em")
 
-    if _has_field(LogWhatsapps, "criado_em"):
-        date_hierarchy = "criado_em"
-
-    ordering = ("-id",) if _has_field(LogWhatsapps, "id") else None
+    def mensagem_resumida(self, obj):
+        txt = (obj.mensagem or "").strip()
+        return (txt[:80] + "…") if len(txt) > 80 else (txt or "—")
+    mensagem_resumida.short_description = "Mensagem"

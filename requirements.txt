@@ -7,6 +7,7 @@ Pillow>=10
 requests
 psycopg2-binary>=2.9 # Driver para PostgreSQL
 dj-database-url # Facilita a leitura da variavel DATABASE_URL
+python-dotenv
 # Adicionar S3
 # Adicione outros pacotes do seu projeto que você usa (ex:
 # django-debug-toolbar

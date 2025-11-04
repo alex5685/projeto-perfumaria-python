@@ -1,83 +1,95 @@
-# loja/admin.py
 from django.contrib import admin
-from django.utils.html import format_html
-
 from .models import Produto, Pedido, LogWhatsapps
 
+# utilitários ---------------------------------------------------------------
+
+def field_names(model):
+    """Retorna o conjunto de nomes de campos reais do modelo."""
+    return {f.name for f in model._meta.get_fields()}
+
+def keep_existing(model, names):
+    """Mantém apenas os nomes que existem no model (ignora None/duplos)."""
+    if not names:
+        return []
+    names = [n for n in names if n]  # remove None/strings vazias
+    existing = field_names(model)
+    out = []
+    for n in names:
+        base = n.lstrip("-")  # suporta ordenação com '-'
+        if base in existing:
+            out.append(n)
+    # evita lista vazia em locais que precisam de ao menos 1 entrada
+    return out
+
+class SafeAdmin(admin.ModelAdmin):
+    """
+    ModelAdmin que só expõe campos existentes — evita falhas de system check
+    (admin.E0xx) quando os modelos mudam e ainda não têm migrações aplicadas.
+    """
+    # candidatas (defina nas subclasses)
+    list_display_candidates     = ()
+    list_filter_candidates      = ()
+    search_fields_candidates    = ()
+    readonly_fields_candidates  = ()
+    ordering_candidates         = ()
+    date_hierarchy_candidate    = None
+
+    # getters dinâmicos usados pelo Django e pelos system checks
+    def get_list_display(self, request):
+        values = keep_existing(self.model, self.list_display_candidates)
+        # fallback amigável
+        return tuple(values or ("id", "__str__"))
+
+    def get_list_filter(self, request):
+        return tuple(keep_existing(self.model, self.list_filter_candidates))
+
+    def get_search_fields(self, request):
+        return tuple(keep_existing(self.model, self.search_fields_candidates))
+
+    def get_readonly_fields(self, request, obj=None):
+        return tuple(keep_existing(self.model, self.readonly_fields_candidates))
+
+    def get_ordering(self, request):
+        return tuple(keep_existing(self.model, self.ordering_candidates))
+
+    def get_date_hierarchy(self, request):
+        cand = self.date_hierarchy_candidate
+        if cand and cand in field_names(self.model):
+            return cand
+        return None
+
+# Produto -------------------------------------------------------------------
 
 @admin.register(Produto)
-class ProdutoAdmin(admin.ModelAdmin):
-    # Campos que existem de fato no modelo Produto
-    list_display = (
-        "id",
-        "nome",
-        "preco_venda",
-        "quantidade_estoque",
-        "disponivel_no_site",
-        "criado_em",
-        "atualizado_em",
-        "preview_imagem",
-    )
-    list_display_links = ("id", "nome")
-    search_fields = ("nome",)
-    list_filter = ("disponivel_no_site",)
-    date_hierarchy = "criado_em"
-    ordering = ("-criado_em",)
+class ProdutoAdmin(SafeAdmin):
+    list_display_candidates    = ("id", "nome", "preco_venda", "quantidade_estoque",
+                                  "disponivel_no_site", "criado_em", "atualizado_em")
+    list_filter_candidates     = ("disponivel_no_site",)
+    search_fields_candidates   = ("nome", "descricao_detalhada")
+    readonly_fields_candidates = ("criado_em", "atualizado_em")
+    ordering_candidates        = ("-criado_em", "nome")
+    date_hierarchy_candidate   = "criado_em"
 
-    readonly_fields = ("criado_em", "atualizado_em", "preview_imagem")
-
-    fieldsets = (
-        ("Informações do Produto", {
-            "fields": ("nome", "descricao_detalhada", "imagem", "preview_imagem")
-        }),
-        ("Comercial/Estoque", {
-            "fields": ("preco_venda", "quantidade_estoque", "disponivel_no_site")
-        }),
-        ("Auditoria", {
-            "fields": ("criado_em", "atualizado_em")
-        }),
-    )
-
-    def preview_imagem(self, obj):
-        """Pequena prévia da imagem (se existir)."""
-        if obj.imagem:
-            return format_html(
-                '<img src="{}" style="height:60px;border-radius:6px;" />',
-                obj.imagem.url,
-            )
-        return "—"
-    preview_imagem.short_description = "Prévia"
-
+# Pedido --------------------------------------------------------------------
 
 @admin.register(Pedido)
-class PedidoAdmin(admin.ModelAdmin):
-    # CUIDADO: o modelo atual de Pedido só tem 'criado_em'
-    list_display = ("id", "criado_em")
-    list_display_links = ("id",)
-    date_hierarchy = "criado_em"
-    ordering = ("-criado_em",)
-    readonly_fields = ("criado_em",)
+class PedidoAdmin(SafeAdmin):
+    # coloquei um conjunto amplo de candidatos; o mixin filtra os inexistentes
+    list_display_candidates    = ("id", "cliente", "status", "total",
+                                  "criado_em", "atualizado_em")
+    list_filter_candidates     = ("status",)
+    search_fields_candidates   = ("cliente", "email", "telefone")
+    readonly_fields_candidates = ("criado_em", "atualizado_em")
+    ordering_candidates        = ("-criado_em",)
+    date_hierarchy_candidate   = "criado_em"
 
-    fieldsets = (
-        ("Pedido", {"fields": ("criado_em",)}),
-    )
-
+# LogWhatsapps --------------------------------------------------------------
 
 @admin.register(LogWhatsapps)
-class LogWhatsappsAdmin(admin.ModelAdmin):
-    # Campos existentes: 'mensagem' e 'criado_em'
-    list_display = ("id", "mensagem_resumida", "criado_em")
-    list_display_links = ("id",)
-    search_fields = ("mensagem",)
-    date_hierarchy = "criado_em"
-    ordering = ("-criado_em",)
-    readonly_fields = ("criado_em",)
-
-    fieldsets = (
-        ("Log de WhatsApp", {"fields": ("mensagem", "criado_em")}),
-    )
-
-    def mensagem_resumida(self, obj):
-        txt = (obj.mensagem or "").strip()
-        return (txt[:80] + "…") if len(txt) > 80 else (txt or "—")
-    mensagem_resumida.short_description = "Mensagem"
+class LogWhatsappsAdmin(SafeAdmin):
+    list_display_candidates    = ("id", "pedido", "evento", "detalhes", "criado_em")
+    list_filter_candidates     = ("evento",)
+    search_fields_candidates   = ("pedido__id", "detalhes")
+    readonly_fields_candidates = ("criado_em",)
+    ordering_candidates        = ("-criado_em",)
+    date_hierarchy_candidate   = "criado_em"

@@ -1,4 +1,3 @@
-# loja/models.py
 from django.db import models
 
 
@@ -6,7 +5,7 @@ class Produto(models.Model):
     nome = models.CharField(max_length=255)
     descricao_detalhada = models.TextField(blank=True)
     preco_venda = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    quantidade_estoque = models.PositiveIntegerField(default=0)
+    quantidade_estoque = models.IntegerField(default=0)
     imagem = models.ImageField(upload_to="produtos/", blank=True, null=True)
     disponivel_no_site = models.BooleanField(default=True)
     criado_em = models.DateTimeField(auto_now_add=True)
@@ -22,9 +21,7 @@ class Produto(models.Model):
 
 
 class Pedido(models.Model):
-    # se no seu código antigo tinha “cliente”, “telefone” etc, dá pra pôr aqui,
-    # mas vamos começar do mínimo para o admin não quebrar.
-    nome = models.CharField("Nome do cliente / referência", max_length=255)
+    nome = models.CharField(max_length=255)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -34,12 +31,14 @@ class Pedido(models.Model):
         verbose_name_plural = "Pedidos"
 
     def __str__(self):
-        return f"Pedido #{self.id} - {self.nome}"
+        return f"Pedido #{self.pk} - {self.nome}"
 
 
 class LogWhatsapps(models.Model):
-    # ⚠️ AQUI estava o problema no Render:
-    # NUNCA usar default=timezone.now numa FK.
+    """
+    Log de eventos/integrações do WhatsApp.
+    O vínculo com Pedido é opcional para não bloquear migração nem inserções.
+    """
     pedido = models.ForeignKey(
         Pedido,
         on_delete=models.CASCADE,
@@ -47,16 +46,18 @@ class LogWhatsapps(models.Model):
         null=True,
         blank=True,
     )
-    mensagem = models.TextField()
+    telefone = models.CharField(max_length=30, blank=True)
+    mensagem = models.TextField(blank=True)
+    status = models.CharField(max_length=50, blank=True)
+
     criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-criado_em"]
-        verbose_name = "Log de Whatsapp"
-        verbose_name_plural = "Logs de Whatsapp"
+        verbose_name = "Log de WhatsApp"
+        verbose_name_plural = "Logs de WhatsApp"
 
     def __str__(self):
-        if self.pedido_id:
-            return f"Log {self.id} (pedido {self.pedido_id})"
-        return f"Log {self.id}"
-
+        base = f"Log #{self.pk}"
+        return f"{base} (pedido {self.pedido_id})" if self.pedido_id else base

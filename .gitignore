@@ -1,23 +1,21 @@
-# Virtual environment
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.venv/
 venv/
 
-# Database
-# db.sqlite3
-# Adiciona o arquivo do banco de dados ao rastreamento do Git
-git add db.sqlite3 
-
-# Adiciona as outras mudanças (e o .gitignore, se você o editou)
-git add .
-
-git commit -m "Adiciona db.sqlite3 com Superusuario e migrações iniciais para deploy no Render"
-
-# Envia para o GitHub (use seu Token de Acesso Pessoal como senha)
-git push -u origin master
-
-# Static files and media files
-/staticfiles
-/media
-
-# Environment variables
-.env
+# Django
 db.sqlite3
+media/
+staticfiles/
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+
+# Bytecode / cache
+*.log
+*.sqlite3

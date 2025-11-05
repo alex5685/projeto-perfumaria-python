@@ -31,7 +31,7 @@ class Pedido(models.Model):
         verbose_name_plural = "Pedidos"
 
     def __str__(self):
-        return f"Pedido #{self.pk} - {self.nome}"
+        return f"Pedido #{self.pk}"
 
 
 class LogWhatsapps(models.Model):
@@ -39,6 +39,7 @@ class LogWhatsapps(models.Model):
     Log de eventos/integrações do WhatsApp.
     O vínculo com Pedido é opcional para não bloquear migração nem inserções.
     """
+
     pedido = models.ForeignKey(
         Pedido,
         on_delete=models.CASCADE,
@@ -59,5 +60,4 @@ class LogWhatsapps(models.Model):
         verbose_name_plural = "Logs de WhatsApp"
 
     def __str__(self):
-        base = f"Log #{self.pk}"
-        return f"{base} (pedido {self.pedido_id})" if self.pedido_id else base
+        return f"LogWhatsApp #{self.pk}"

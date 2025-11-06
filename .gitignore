@@ -19,3 +19,6 @@ staticfiles/
 # Bytecode / cache
 *.log
 *.sqlite3
+
+# segredos
+chave-de-acesso.txt

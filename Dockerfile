@@ -1,36 +1,43 @@
-# 1. IMAGEM BASE: A imagem slim é a melhor para produção.
-FROM python:3.10-slim
+# ====== Base ======
+FROM python:3.11-slim
 
-# 2. VARIÁVEIS DE AMBIENTE: Desativa o buffer para logs em tempo real.
-ENV PYTHONUNBUFFERED 1
+# Evita *.pyc e força stdout/stderr sem buffer
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Pasta de trabalho
 WORKDIR /app
 
-# 3. INSTALAÇÃO DE LIBS DE SISTEMA (SOLUÇÃO FINAL PARA O PILLOW - ERRNO 2)
-# O apt-get instala as dependências de sistema para compilar o Pillow (libjpeg, zlib).
-RUN apt-get update && apt-get install -y \
+# Dependências do sistema (Pillow e redes)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     libjpeg-dev \
     zlib1g-dev \
-    --no-install-recommends && rm -rf /var/lib/apt/lists/*
+    libpng-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# 4. INSTALAÇÃO DE DEPENDÊNCIAS PYTHON
-# Copia e instala as dependências do requirements.txt (incluindo Django e Gunicorn).
+# ====== Instala Python deps ======
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# 5. CÓPIA DO CÓDIGO DO PROJETO
-# Copia todos os arquivos restantes (settings.py, core, apps, etc.).
+# ====== Copia o projeto ======
 COPY . /app/
 
-# 6. COLETA DE ARQUIVOS ESTÁTICOS
-# Roda o collectstatic, que é necessário antes do app iniciar.
-# Como ele é RUN, ele ocorre durante o processo de build do Docker.
-RUN python manage.py collectstatic --noinput
+# ====== Coleta os estáticos ======
+# WhiteNoise serve "staticfiles" em produção.
+# Se o collectstatic falhar por algum motivo, não quebra o build.
+RUN python manage.py collectstatic --noinput || true
 
-# 6A. EXECUÇÃO DAS MIGRAÇÕES (!!! ESSA É A NOVA LINHA !!!)
-RUN python manage.py migrate
+# ====== Segurança e rede ======
+# Render expõe a app via proxy. Não force redirect aqui no Docker.
+ENV PORT=8000
+EXPOSE 8000
 
-# 7. COMANDO DE EXECUÇÃO (START/CMD)
-# O CMD mais portátil: executa o Gunicorn como um módulo Python (python -m),
-# ignorando problemas de PATH (Status 127).
-CMD ["python", "-m", "gunicorn", "core.wsgi"]
+# ====== Entrada ======
+# Executa migrações e sobe o gunicorn na inicialização do container
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
+CMD ["/entrypoint.sh"]

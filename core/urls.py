@@ -3,5 +3,5 @@ from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", include("loja.urls")),  # <- garante /diag/ping e /diag/db
+    path("", include("loja.urls")),  # rotas do app (mínimas), não afeta admin
 ]
